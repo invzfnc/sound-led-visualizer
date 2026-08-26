@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+//#define DEBUG  // comment this to disable debug
+
 #define MAX_BARS 7
 #define MIC_PIN 19
 
@@ -10,8 +12,8 @@
 #define LOOP_DELAY 1  // milliseconds
 #define READ_DELAY 50 // microseconds
 
-#define DECAY_RATE 0.996f  // larger = more responsive/remember peak better
-#define MIN_RMS 4.0f
+#define DECAY_RATE 0.996f
+#define MIN_RMS 4.0f  // adjust this to debug mode observations
 
 const int ledPins[MAX_BARS] = {21, 47, 38, 39, 40, 41, 42};
 float maxRms = 0;
@@ -21,7 +23,6 @@ void updateLeds(int);
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("boot ok");
 
   for (int i = 0; i < MAX_BARS; i++) {
     pinMode(ledPins[i], OUTPUT);
@@ -68,16 +69,18 @@ void loop() {
   float normalized = constrain(rms / maxRms, 0.0, 1.0);
   int bars = (int)(normalized * MAX_BARS);
   
-  Serial.print("dcBias: ");
-  Serial.print(dcBias);
-  Serial.print(" | component: ");
-  Serial.print(component);
-  Serial.print(" | rms: ");
-  Serial.print(rms);
-  Serial.print(" | maxRms: ");
-  Serial.print(maxRms);
-  Serial.print(" | bars: ");
-  Serial.println(bars);
+  #ifdef DEBUG
+    Serial.print("dcBias: ");
+    Serial.print(dcBias);
+    Serial.print(" | component: ");
+    Serial.print(component);
+    Serial.print(" | rms: ");
+    Serial.print(rms);
+    Serial.print(" | maxRms: ");
+    Serial.print(maxRms);
+    Serial.print(" | bars: ");
+    Serial.println(bars);
+  #endif
 
   updateLeds(bars);
   delay(LOOP_DELAY);

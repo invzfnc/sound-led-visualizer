@@ -6,12 +6,12 @@
 // these three are dependant
 // less samples gives less sensitive and less accurate results, but less delay
 // more samples gives more accurate results, but more delay
-#define SAMPLE_COUNT 512 // tested sweet spot between 256 and 512
+#define SAMPLE_COUNT 256 // tested sweet spot between 256 and 512
 #define LOOP_DELAY 1  // milliseconds
 #define READ_DELAY 50 // microseconds
 
-#define DECAY_RATE 0.98f
-#define MIN_RMS 0.4f
+#define DECAY_RATE 0.996f  // larger = more responsive/remember peak better
+#define MIN_RMS 4.0f
 
 const int ledPins[MAX_BARS] = {21, 47, 38, 39, 40, 41, 42};
 float maxRms = 0;
@@ -48,7 +48,7 @@ void loop() {
   // calculate root mean square
   for (int i = 0; i < SAMPLE_COUNT; i++) {
     component = (float)samples[i] - dcBias;
-    sumOfSquares = component * component;
+    sumOfSquares += component * component;
   }
 
   float rms = std::sqrt(sumOfSquares / SAMPLE_COUNT);
@@ -86,7 +86,7 @@ void loop() {
 /* turn on and turn off LEDs given number of lit bars */
 void updateLeds(int bars) {
   for (int i = 0; i < MAX_BARS; i++) {
-    if (i <= bars) {
+    if (i < bars) {
       digitalWrite(ledPins[i], HIGH);
     }
     else {

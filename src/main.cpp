@@ -2,13 +2,21 @@
 
 #define MAX_BARS 7
 #define MIC_PIN 19
-#define SAMPLE_WINDOW 50
-#define DELAY 50
+
+// these three are dependant
+// less samples gives less sensitive and less accurate results, but less delay
+// more samples gives more accurate results, but more delay
+#define SAMPLE_COUNT 512 // tested sweet spot between 256 and 512
+#define LOOP_DELAY 1  // milliseconds
+#define READ_DELAY 50 // microseconds
+
+#define DECAY_RATE 0.98f
+#define MIN_RMS 0.4f
 
 const int ledPins[MAX_BARS] = {21, 47, 38, 39, 40, 41, 42};
-unsigned long startMillis;
+float maxRms = 0;
+int samples[SAMPLE_COUNT];
 
-int calculateBars();
 void updateLeds(int);
 
 void setup() {
@@ -21,38 +29,58 @@ void setup() {
 }
 
 void loop() {
-  int bars = calculateBars();
-  Serial.print("bars: ");
-  Serial.println(bars);
-  updateLeds(bars);
-  delay(DELAY);
-}
+  long sum = 0;
 
-/* translates volume detected to bar/level */
-int calculateBars() {
-  unsigned int signalMin = 1024;
-  unsigned int signalMax = 0;
-  unsigned int signal;
+  for (int i = 0; i < SAMPLE_COUNT; i++) {
+    int sample = analogRead(MIC_PIN);
+    sum += sample;
+    samples[i] = sample;
 
-  startMillis = millis();
-
-  while (millis() - startMillis < SAMPLE_WINDOW) {
-    signal = analogRead(MIC_PIN);
-    if (signal > signalMax)
-      signalMax = signal;
-    if (signal < signalMin) 
-      signalMin = signal;
+    delayMicroseconds(READ_DELAY);
   }
 
-  // debug
-  Serial.print("signalMin: ");
-  Serial.print(signalMin);
-  Serial.print(" | signalMax: ");
-  Serial.print(signalMax);
-  Serial.print(" | signal: ");
-  Serial.println(signal);
+  // calculate dc bias
+  float dcBias = (float)sum / SAMPLE_COUNT;
 
-  return map(signal, signalMin, signalMax, 0, MAX_BARS);
+  float sumOfSquares = 0;
+  float component;
+
+  // calculate root mean square
+  for (int i = 0; i < SAMPLE_COUNT; i++) {
+    component = (float)samples[i] - dcBias;
+    sumOfSquares = component * component;
+  }
+
+  float rms = std::sqrt(sumOfSquares / SAMPLE_COUNT);
+
+  // update max rms
+  if (rms > maxRms) {
+    maxRms = rms;
+  }
+  else {
+    maxRms *= DECAY_RATE;
+  }
+
+  if (maxRms < MIN_RMS) {
+    maxRms = MIN_RMS;
+  }
+
+  float normalized = constrain(rms / maxRms, 0.0, 1.0);
+  int bars = (int)(normalized * MAX_BARS);
+  
+  Serial.print("dcBias: ");
+  Serial.print(dcBias);
+  Serial.print(" | component: ");
+  Serial.print(component);
+  Serial.print(" | rms: ");
+  Serial.print(rms);
+  Serial.print(" | maxRms: ");
+  Serial.print(maxRms);
+  Serial.print(" | bars: ");
+  Serial.println(bars);
+
+  updateLeds(bars);
+  delay(LOOP_DELAY);
 }
 
 /* turn on and turn off LEDs given number of lit bars */
